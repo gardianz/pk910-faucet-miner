@@ -18,6 +18,11 @@ Pilih satu, dua, atau ketiganya lewat `FAUCETS` di `.env` (dipisah koma).
 PoW params, difficulty, dan provider captcha dibaca otomatis per faucet dari
 `getFaucetConfig`, jadi bot menyesuaikan sendiri.
 
+**Browser vs tanpa-browser:** faucet dengan captcha **langsung** (ephemery = hCaptcha)
+diproses **tanpa Chromium** — solve via multibot lalu POST `/startSession` (ringan).
+Faucet **custom wrapper** (sepolia/hoodi) mengikat token ke fingerprint browser,
+jadi masih butuh Chromium headless singkat saat mulai sesi.
+
 ## Yang dibutuhkan
 
 - **Node.js ≥ 20** (`node -v` untuk cek).

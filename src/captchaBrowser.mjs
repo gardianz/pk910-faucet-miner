@@ -57,7 +57,7 @@ async function injectToken(page, provider, token) {
   }, { provider, token });
 }
 
-export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, headless = true, timeoutMs = 180000, attempts = 3, solveTimeoutMs = 180000 }) {
+export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, headless = true, timeoutMs = 180000, attempts = 3, solveTimeoutMs = 180000, log = console }) {
   const launchOpts = { headless, args: ["--no-sandbox", "--disable-setuid-sandbox"] };
   if (proxy) launchOpts.proxy = { server: proxy };
   // Optional: point the Chromium child at extracted system libs (no-root WSL/containers).
@@ -84,6 +84,7 @@ export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, h
     let lastErr;
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
+        log.info?.(`  [browser] attempt ${attempt}/${attempts}: loading page + rendering captcha...`);
         await page.goto(faucetUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
         await page.fill('input[type="text"], input[placeholder*="ddress"]', addr);
         await page.waitForSelector(
@@ -94,7 +95,10 @@ export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, h
         if (!provider || !sitekey) throw new Error("captcha provider/sitekey not detected");
 
         const method = provider === "recaptcha" ? "userrecaptcha" : provider;
+        log.info?.(`  [browser] captcha=${provider} detected — solving via multibot (bisa 1-5 menit)...`);
+        const t0 = Date.now();
         const token = await solver.solve({ method, sitekey, pageurl: faucetUrl, proxy }, { timeoutMs: solveTimeoutMs, intervalMs: 5000 });
+        log.info?.(`  [browser] solved in ${Math.round((Date.now() - t0) / 1000)}s, injecting + starting session...`);
 
         if (provider === "recaptcha") {
           // patch grecaptcha on the already-loaded page so pk910's grecaptcha.execute()/getResponse() return our token.

@@ -24,6 +24,7 @@ export class FaucetApi {
   }
 
   getFaucetConfig(proxy) { return this._get(`/getFaucetConfig?cliver=${encodeURIComponent(this.cliver)}`, proxy); }
+  startSession(inputData, proxy) { return this._post(`/startSession?cliver=${encodeURIComponent(this.cliver)}`, inputData, proxy); }
   getSession(id, proxy) { return this._get(`/getSession?session=${encodeURIComponent(id)}`, proxy); }
   getSessionStatus(id, proxy) { return this._get(`/getSessionStatus?session=${encodeURIComponent(id)}&details=1`, proxy); }
   claimReward(id, proxy) { return this._post(`/claimReward`, { session: id }, proxy); }

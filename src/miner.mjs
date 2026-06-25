@@ -2,6 +2,7 @@ import { createHasher } from "./pow/hasher.mjs";
 import { getPoWParamsStr, preimageHex, nonceHex } from "./powParams.mjs";
 import { WsClient } from "./wsClient.mjs";
 import { startSessionViaBrowser } from "./captchaBrowser.mjs";
+import { startSessionHttp } from "./captchaHttp.mjs";
 
 // mirrors PoWMiner.getLimitedNonceRefillCount: allowed nonces ≈ (age+4)*limit - lastNonce
 export function nextNonceBudget(sessionStartSec, lastNonce, hashrateLimit, now = Date.now()) {
@@ -37,15 +38,17 @@ export async function mineWallet({ wallet, faucet, cfg, api, solver, log = conso
   const threshold = computeThreshold(cfg, faucetConfig.minClaim, faucetConfig.maxClaim);
   const tag = `${faucet.name}:${wallet.addr}`;
 
-  log.info?.(`[${tag}] starting captcha + session (algo=${params.a} diff=${difficulty})`);
-  const sessionInfo = await startSessionViaBrowser({
-    faucetUrl: faucet.url, addr: wallet.addr, proxy: wallet.proxy, solver,
-  });
+  const cap = faucetConfig.modules.captcha;
+  log.info?.(`[${tag}] starting session (algo=${params.a} diff=${difficulty} captcha=${cap.provider})`);
+  const sessionInfo = (cap.provider && cap.provider !== "custom")
+    ? await startSessionHttp({ api, faucetUrl: faucet.url, captcha: cap, addr: wallet.addr, proxy: wallet.proxy, solver, log })
+    : await startSessionViaBrowser({ faucetUrl: faucet.url, addr: wallet.addr, proxy: wallet.proxy, solver, log });
   const sessionId = sessionInfo.session;
   const startSec = sessionInfo.start;
   const preImage = sessionInfo.modules?.pow?.preImage;
   if (!preImage) throw new Error("session has no pow preImage");
   const preHex = preimageHex(preImage);
+  log.info?.(`[${tag}] session ${sessionId} started (threshold=${threshold} wei)`);
 
   let hasher = await createHasher(params, difficulty);
   hasher.configure(preHex);
@@ -95,6 +98,8 @@ export async function mineWallet({ wallet, faucet, cfg, api, solver, log = conso
   };
 
   // mining loop, paced to hashrate limit, until threshold reached
+  let sharesFound = 0;
+  let lastBeat = Date.now();
   while (balance < threshold) {
     const budget = nextNonceBudget(startSec, lastNonce, hashrateLimit);
     if (budget <= 0) { await sleep(1000); continue; }
@@ -102,11 +107,17 @@ export async function mineWallet({ wallet, faucet, cfg, api, solver, log = conso
     for (let k = 0; k < batch; k++) {
       const { valid, data } = hasher.hashShare(nonceHex(lastNonce));
       if (valid) {
+        sharesFound++;
         ws.sendRequest("foundShare", { nonce: lastNonce, data, params: paramsStr, hashrate: hashrateLimit })
           .then(() => { invalidShareStreak = 0; })
           .catch((err) => onShareError(err));
       }
       lastNonce++;
+    }
+    if (Date.now() - lastBeat > 15000) { // heartbeat so the run isn't silent
+      lastBeat = Date.now();
+      const pct = threshold > 0n ? Number((balance * 100n) / threshold) : 0;
+      log.info?.(`[${tag}] mining... shares=${sharesFound} balance=${balance}/${threshold} (${pct}%) nonce=${lastNonce}`);
     }
     await sleep(1000); // 1 batch/sec keeps us within hashrateLimit
   }
