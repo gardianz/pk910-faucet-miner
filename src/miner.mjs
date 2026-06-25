@@ -11,6 +11,20 @@ export function nextNonceBudget(sessionStartSec, lastNonce, hashrateLimit, now =
   return budget > 0 ? budget : 0;
 }
 
+// Decide how much to mine before claiming, clamped to the faucet's [minClaim, maxClaim].
+// Precedence: absolute CLAIM_THRESHOLD_WEI > CLAIM_PERCENT of maxClaim > minClaim (claim ASAP).
+export function computeThreshold({ claimThresholdWei, claimPercent }, minClaimStr, maxClaimStr) {
+  const minC = BigInt(minClaimStr);
+  const maxC = BigInt(maxClaimStr);
+  let t;
+  if (claimThresholdWei != null) t = claimThresholdWei;
+  else if (claimPercent != null) t = (maxC * BigInt(Math.round(claimPercent))) / 100n;
+  else t = minC;
+  if (t < minC) t = minC;
+  if (t > maxC) t = maxC;
+  return t;
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export async function mineWallet({ wallet, faucet, cfg, api, solver, log = console }) {
@@ -20,8 +34,7 @@ export async function mineWallet({ wallet, faucet, cfg, api, solver, log = conso
   let difficulty = pow.powDifficulty;
   let hashrateLimit = pow.powHashrateLimit || 0;
   let paramsStr = getPoWParamsStr(params, difficulty);
-  // default: claim as soon as eligible (minClaim); maxClaim differs wildly per faucet
-  const threshold = cfg.claimThresholdWei ?? BigInt(faucetConfig.minClaim);
+  const threshold = computeThreshold(cfg, faucetConfig.minClaim, faucetConfig.maxClaim);
   const tag = `${faucet.name}:${wallet.addr}`;
 
   log.info?.(`[${tag}] starting captcha + session (algo=${params.a} diff=${difficulty})`);

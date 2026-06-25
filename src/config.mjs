@@ -26,6 +26,11 @@ export function loadConfig(env = process.env) {
 
   const claimThresholdWei = env.CLAIM_THRESHOLD_WEI ? BigInt(env.CLAIM_THRESHOLD_WEI) : null;
 
+  // alternative to an absolute threshold: mine until balance reaches this % of the faucet's maxClaim
+  const claimPercent = env.CLAIM_PERCENT ? Number(env.CLAIM_PERCENT) : null;
+  if (claimPercent != null && (!Number.isFinite(claimPercent) || claimPercent <= 0 || claimPercent > 100))
+    throw new Error("CLAIM_PERCENT must be a number between 1 and 100");
+
   const wallets = [];
   for (let i = 1; i <= 3; i++) {
     const addr = env[`WALLET_${i}_ADDR`];
@@ -35,5 +40,5 @@ export function loadConfig(env = process.env) {
   }
   if (wallets.length === 0) throw new Error("no wallets configured (set WALLET_1_ADDR..WALLET_3_ADDR)");
 
-  return { faucets, cliver, multibotApikey, claimThresholdWei, wallets };
+  return { faucets, cliver, multibotApikey, claimThresholdWei, claimPercent, wallets };
 }

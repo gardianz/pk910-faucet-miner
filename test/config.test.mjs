@@ -41,7 +41,15 @@ test("parses wallets, proxies, threshold", () => {
 });
 
 test("null threshold when unset", () => {
-  assert.equal(loadConfig(base).claimThresholdWei, null);
+  const cfg = loadConfig(base);
+  assert.equal(cfg.claimThresholdWei, null);
+  assert.equal(cfg.claimPercent, null);
+});
+
+test("parses CLAIM_PERCENT and rejects out-of-range", () => {
+  assert.equal(loadConfig({ ...base, CLAIM_PERCENT: "75" }).claimPercent, 75);
+  assert.throws(() => loadConfig({ ...base, CLAIM_PERCENT: "0" }), /CLAIM_PERCENT/);
+  assert.throws(() => loadConfig({ ...base, CLAIM_PERCENT: "150" }), /CLAIM_PERCENT/);
 });
 
 test("rejects bad address", () => {
