@@ -48,6 +48,7 @@ export class WsClient extends EventEmitter {
   }
 
   sendMessage(action, data) {
+    if (!this.sock || this.sock.readyState !== WebSocket.OPEN) throw new Error("ws not open");
     const message = { action };
     if (data !== undefined) message.data = data;
     this.sock.send(JSON.stringify(message));
