@@ -7,15 +7,25 @@ export class CaptchaSolver {
     this.fetchFn = fetchFn;
   }
 
-  async _get(url) {
-    const res = await this.fetchFn(url);
-    return (await res.text()).trim();
+  async _get(url, retries = 3) {
+    let lastErr;
+    for (let i = 0; i < retries; i++) {
+      try {
+        const res = await this.fetchFn(url);
+        return (await res.text()).trim();
+      } catch (e) {
+        lastErr = e;
+        await sleep(1500);
+      }
+    }
+    throw lastErr;
   }
 
   // opts: { method, sitekey?, pageurl, proxy?, extra? }
   async submit({ method, sitekey, pageurl, proxy, extra = {} }) {
     const params = new URLSearchParams({ key: this.apikey, method, pageurl, json: "0", ...extra });
-    if (sitekey) params.set("sitekey", sitekey);
+    // reCAPTCHA uses `googlekey`; hCaptcha/Turnstile use `sitekey`
+    if (sitekey) params.set(method === "userrecaptcha" ? "googlekey" : "sitekey", sitekey);
     if (proxy) {
       params.set("proxy", proxy.replace(/^\w+:\/\//, ""));
       params.set("proxytype", proxy.startsWith("socks5") ? "SOCKS5" : "HTTP");

@@ -22,3 +22,13 @@ test("poll throws on hard error", async () => {
   const solver = new CaptchaSolver("k", fakeFetch(["ERROR_CAPTCHA_UNSOLVABLE"]));
   await assert.rejects(() => solver.poll("42", { intervalMs: 1 }), /ERROR_CAPTCHA_UNSOLVABLE/);
 });
+
+test("submit uses googlekey for recaptcha, sitekey otherwise", async () => {
+  const urls = [];
+  const rec = (url) => { urls.push(url); return { text: async () => "OK|1" }; };
+  await new CaptchaSolver("k", rec).submit({ method: "userrecaptcha", sitekey: "RC", pageurl: "https://x" });
+  await new CaptchaSolver("k", rec).submit({ method: "hcaptcha", sitekey: "HC", pageurl: "https://x" });
+  assert.match(urls[0], /[?&]googlekey=RC(&|$)/);
+  assert.ok(!/[?&]sitekey=/.test(urls[0]), "recaptcha must not send sitekey");
+  assert.match(urls[1], /[?&]sitekey=HC(&|$)/);
+});

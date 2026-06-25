@@ -48,7 +48,7 @@ async function injectToken(page, provider, token) {
 }
 
 export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, headless = true, timeoutMs = 180000 }) {
-  const launchOpts = { headless };
+  const launchOpts = { headless, args: ["--no-sandbox", "--disable-setuid-sandbox"] };
   if (proxy) launchOpts.proxy = { server: proxy };
   const browser = await chromium.launch(launchOpts);
   try {

@@ -20,3 +20,9 @@ test("run returns a 0x hash for sequential nonces", async () => {
     assert.ok(typeof h === "string" && h.startsWith("0x"), `nonce ${n} -> ${h}`);
   }
 });
+
+test("initNickminer restores wall-clock Date.now (emscripten clobbers it)", async () => {
+  await initNickminer();
+  // emscripten runtime sets Date.now to ms-since-init (~10ms); must be restored
+  assert.ok(Date.now() > 1700000000000, `Date.now() should be wall-clock ms, got ${Date.now()}`);
+});
