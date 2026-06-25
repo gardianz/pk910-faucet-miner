@@ -77,9 +77,11 @@ export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, h
     const token = await solver.solve({ method, sitekey, pageurl: faucetUrl, proxy });
 
     if (provider === "recaptcha") {
-      await page.addInitScript((t) => {
+      // patch grecaptcha on the already-loaded page so pk910's grecaptcha.execute() returns our token.
+      // addInitScript only affects future navigations, so it cannot patch the current page.
+      await page.evaluate((t) => {
         const ret = () => Promise.resolve(t);
-        Object.defineProperty(window, "grecaptcha", { value: { ready: (cb) => cb(), execute: ret, render: () => 0 }, configurable: true });
+        window.grecaptcha = { ready: (cb) => cb(), execute: ret, render: () => 0, getResponse: () => t };
       }, token);
     }
     await injectToken(page, provider, token);
