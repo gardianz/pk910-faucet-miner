@@ -60,6 +60,12 @@ async function injectToken(page, provider, token) {
 export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, headless = true, timeoutMs = 180000, attempts = 3, solveTimeoutMs = 180000 }) {
   const launchOpts = { headless, args: ["--no-sandbox", "--disable-setuid-sandbox"] };
   if (proxy) launchOpts.proxy = { server: proxy };
+  // Optional: point the Chromium child at extracted system libs (no-root WSL/containers).
+  // Set CHROME_LIBS_PATH to a dir containing libnspr4.so/libnss3.so/... in .env.
+  if (process.env.CHROME_LIBS_PATH) {
+    const prev = process.env.LD_LIBRARY_PATH ? ":" + process.env.LD_LIBRARY_PATH : "";
+    launchOpts.env = { ...process.env, LD_LIBRARY_PATH: process.env.CHROME_LIBS_PATH + prev };
+  }
   const browser = await chromium.launch(launchOpts);
   try {
     const page = await browser.newPage();

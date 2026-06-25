@@ -104,14 +104,19 @@ CLAIM_PERCENT=80
 
 ## Troubleshooting
 
-### Chromium gagal jalan (`error while loading shared libraries`)
+### Chromium gagal jalan (`error while loading shared libraries: libnspr4.so`)
 Chromium butuh library sistem (`libnspr4.so`, `libnss3.so`, `libasound.so.2`, …).
 Pilih salah satu:
 ```bash
-# A. install (Debian/Ubuntu/WSL, butuh root)
+# A. install (Debian/Ubuntu/WSL, butuh root) — paling bersih
 sudo npx playwright install-deps chromium
-
-# B. tanpa root: tunjuk LD_LIBRARY_PATH ke kumpulan lib hasil ekstrak
+```
+```bash
+# B. tanpa root: set CHROME_LIBS_PATH di .env ke folder lib hasil ekstrak, lalu `npm start` biasa
+CHROME_LIBS_PATH=/path/ke/chrome-libs/usr/lib/x86_64-linux-gnu
+```
+```bash
+# C. tanpa root, sekali jalan: prefix LD_LIBRARY_PATH
 LD_LIBRARY_PATH=/path/ke/chrome-libs/usr/lib/x86_64-linux-gnu npm start
 ```
 Browser dijalankan dengan `--no-sandbox` (wajib di WSL/container/CI).
