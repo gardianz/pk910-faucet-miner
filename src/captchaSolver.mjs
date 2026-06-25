@@ -7,15 +7,15 @@ export class CaptchaSolver {
     this.fetchFn = fetchFn;
   }
 
-  async _get(url, retries = 3) {
+  async _get(url, retries = 6) {
     let lastErr;
     for (let i = 0; i < retries; i++) {
       try {
         const res = await this.fetchFn(url);
         return (await res.text()).trim();
       } catch (e) {
-        lastErr = e;
-        await sleep(1500);
+        lastErr = e; // multibot endpoint is flaky on cold connections (ETIMEDOUT/fetch failed)
+        await sleep(2000);
       }
     }
     throw lastErr;
