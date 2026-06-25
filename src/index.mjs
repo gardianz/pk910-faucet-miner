@@ -10,20 +10,24 @@ const log = {
 
 async function main() {
   const cfg = loadConfig();
-  const api = new FaucetApi(cfg.faucetUrl, cfg.cliver);
   const solver = new CaptchaSolver(cfg.multibotApikey);
 
+  log.info(`faucets: ${cfg.faucets.map((f) => f.name).join(", ")} | wallets: ${cfg.wallets.length}`);
   log.info(`multibot balance: ${await solver.balance().catch((e) => e.message)}`);
 
-  for (const wallet of cfg.wallets) {
-    try {
-      const res = await mineWallet({ wallet, cfg, api, solver, log });
-      log.info(`[${wallet.addr}] DONE claimHash=${res.claimHash} balance=${res.balance}`);
-    } catch (err) {
-      log.warn(`[${wallet.addr}] FAILED: ${err.message}`); // isolate: continue with next wallet
+  for (const faucet of cfg.faucets) {
+    const api = new FaucetApi(faucet.url, faucet.cliver);
+    for (const wallet of cfg.wallets) {
+      const tag = `${faucet.name}:${wallet.addr}`;
+      try {
+        const res = await mineWallet({ wallet, faucet, cfg, api, solver, log });
+        log.info(`[${tag}] DONE claimHash=${res.claimHash} balance=${res.balance}`);
+      } catch (err) {
+        log.warn(`[${tag}] FAILED: ${err.message}`); // isolate: continue with next wallet/faucet
+      }
     }
   }
-  log.info("all wallets processed");
+  log.info("all faucets/wallets processed");
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });

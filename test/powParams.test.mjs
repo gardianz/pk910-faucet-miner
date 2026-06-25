@@ -11,6 +11,11 @@ test("getPoWParamsStr matches live nickminer format", () => {
   );
 });
 
+test("getPoWParamsStr matches live argon2 format", () => {
+  const a2 = { a: "argon2", t: 0, v: 13, i: 4, m: 4096, p: 1, l: 16 };
+  assert.equal(getPoWParamsStr(a2, 8), "argon2|0|13|4|4096|1|16|8");
+});
+
 test("preimageHex decodes base64 to hex", () => {
   // base64 of bytes [0x00,0xff,0x10] => "AP8Q"
   assert.equal(preimageHex("AP8Q"), "00ff10");

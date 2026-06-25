@@ -1,4 +1,4 @@
-import { initNickminer, setConfig, run, isValidShare } from "./nickminer.mjs";
+import { createHasher } from "./pow/hasher.mjs";
 import { getPoWParamsStr, preimageHex, nonceHex } from "./powParams.mjs";
 import { WsClient } from "./wsClient.mjs";
 import { startSessionViaBrowser } from "./captchaBrowser.mjs";
@@ -13,18 +13,20 @@ export function nextNonceBudget(sessionStartSec, lastNonce, hashrateLimit, now =
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export async function mineWallet({ wallet, cfg, api, solver, log = console }) {
+export async function mineWallet({ wallet, faucet, cfg, api, solver, log = console }) {
   const faucetConfig = await api.getFaucetConfig(wallet.proxy);
   const pow = faucetConfig.modules.pow;
   let params = pow.powParams;
   let difficulty = pow.powDifficulty;
   let hashrateLimit = pow.powHashrateLimit || 0;
   let paramsStr = getPoWParamsStr(params, difficulty);
-  const threshold = cfg.claimThresholdWei ?? BigInt(faucetConfig.maxClaim);
+  // default: claim as soon as eligible (minClaim); maxClaim differs wildly per faucet
+  const threshold = cfg.claimThresholdWei ?? BigInt(faucetConfig.minClaim);
+  const tag = `${faucet.name}:${wallet.addr}`;
 
-  log.info?.(`[${wallet.addr}] starting captcha + session`);
+  log.info?.(`[${tag}] starting captcha + session (algo=${params.a} diff=${difficulty})`);
   const sessionInfo = await startSessionViaBrowser({
-    faucetUrl: cfg.faucetUrl, addr: wallet.addr, proxy: wallet.proxy, solver,
+    faucetUrl: faucet.url, addr: wallet.addr, proxy: wallet.proxy, solver,
   });
   const sessionId = sessionInfo.session;
   const startSec = sessionInfo.start;
@@ -32,27 +34,23 @@ export async function mineWallet({ wallet, cfg, api, solver, log = console }) {
   if (!preImage) throw new Error("session has no pow preImage");
   const preHex = preimageHex(preImage);
 
-  await initNickminer();
-  setConfig(params, preHex);
+  let hasher = await createHasher(params, difficulty);
+  hasher.configure(preHex);
 
-  const ws = new WsClient({ wsUrl: cfg.wsUrl, sessionId, cliver: cfg.cliver, proxy: wallet.proxy });
+  const ws = new WsClient({ wsUrl: faucet.wsUrl, sessionId, cliver: faucet.cliver, proxy: wallet.proxy });
   let balance = BigInt(sessionInfo.balance || "0");
   let lastNonce = (sessionInfo.modules?.pow?.lastNonce ?? 0) + 1;
 
   ws.on("updateBalance", (m) => {
     balance = BigInt(m.data.balance);
-    log.info?.(`[${wallet.addr}] balance=${balance} (${m.data.reason})`);
+    log.info?.(`[${tag}] balance=${balance} (${m.data.reason})`);
   });
   ws.on("verify", (m) => {
-    // verify another miner's share with the verification preimage, then restore our config
-    const vPre = preimageHex(m.data.preimage);
-    setConfig(params, vPre);
-    const h = run(nonceHex(m.data.nonce));
-    const isValid = (h === m.data.data);
-    setConfig(params, preHex);
+    // validate a peer's share with the verification preimage (hasher restores mining state)
+    const isValid = hasher.verify(preimageHex(m.data.preimage), nonceHex(m.data.nonce), m.data.data);
     ws.sendRequest("verifyResult", { shareId: m.data.shareId, params: paramsStr, isValid }).catch(() => {});
   });
-  ws.on("error", (m) => log.warn?.(`[${wallet.addr}] ws error ${m.data?.code}: ${m.data?.message}`));
+  ws.on("error", (m) => log.warn?.(`[${tag}] ws error ${m.data?.code}: ${m.data?.message}`));
 
   await ws.connect();
 
@@ -60,7 +58,7 @@ export async function mineWallet({ wallet, cfg, api, solver, log = console }) {
   let refreshing = false;
   const REJECT_LIMIT = 10;
   const onShareError = async (err) => {
-    log.warn?.(`[${wallet.addr}] share rejected: ${err.message}`);
+    log.warn?.(`[${tag}] share rejected: ${err.message}`);
     if (!/INVALID_SHARE|Invalid share params/i.test(err.message)) return;
     invalidShareStreak++;
     if (invalidShareStreak < REJECT_LIMIT || refreshing) return;
@@ -72,11 +70,12 @@ export async function mineWallet({ wallet, cfg, api, solver, log = console }) {
       difficulty = np.powDifficulty;
       hashrateLimit = np.powHashrateLimit || 0;
       paramsStr = getPoWParamsStr(params, difficulty);
-      setConfig(params, preHex);
+      hasher = await createHasher(params, difficulty);
+      hasher.configure(preHex);
       invalidShareStreak = 0;
-      log.info?.(`[${wallet.addr}] refreshed powParams after ${REJECT_LIMIT} INVALID_SHARE`);
+      log.info?.(`[${tag}] refreshed powParams after ${REJECT_LIMIT} INVALID_SHARE`);
     } catch (e) {
-      log.warn?.(`[${wallet.addr}] config refresh failed: ${e.message}`);
+      log.warn?.(`[${tag}] config refresh failed: ${e.message}`);
     } finally {
       refreshing = false;
     }
@@ -88,9 +87,9 @@ export async function mineWallet({ wallet, cfg, api, solver, log = console }) {
     if (budget <= 0) { await sleep(1000); continue; }
     const batch = Math.min(budget, 1000);
     for (let k = 0; k < batch; k++) {
-      const hash = run(nonceHex(lastNonce));
-      if (isValidShare(hash, difficulty)) {
-        ws.sendRequest("foundShare", { nonce: lastNonce, data: hash, params: paramsStr, hashrate: hashrateLimit })
+      const { valid, data } = hasher.hashShare(nonceHex(lastNonce));
+      if (valid) {
+        ws.sendRequest("foundShare", { nonce: lastNonce, data, params: paramsStr, hashrate: hashrateLimit })
           .then(() => { invalidShareStreak = 0; })
           .catch((err) => onShareError(err));
       }
@@ -99,7 +98,7 @@ export async function mineWallet({ wallet, cfg, api, solver, log = console }) {
     await sleep(1000); // 1 batch/sec keeps us within hashrateLimit
   }
 
-  log.info?.(`[${wallet.addr}] threshold reached (${balance}); closing + claiming`);
+  log.info?.(`[${tag}] threshold reached (${balance}); closing + claiming`);
   await ws.sendRequest("closeSession").catch(() => {});
   ws.close();
 
@@ -111,5 +110,5 @@ export async function mineWallet({ wallet, cfg, api, solver, log = console }) {
     if (st.claimStatus === "failed" || st.status === "failed") throw new Error(`claim failed: ${st.failedReason || st.claimMessage}`);
     await sleep(5000);
   }
-  return { status: "done", sessionId, balance: balance.toString(), claimHash };
+  return { status: "done", faucet: faucet.name, sessionId, balance: balance.toString(), claimHash };
 }

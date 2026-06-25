@@ -34,15 +34,25 @@ async function detectProvider(page) {
 
 async function injectToken(page, provider, token) {
   await page.evaluate(({ provider, token }) => {
+    const setVals = (sel) => document.querySelectorAll(sel).forEach((e) => { e.value = token; });
     if (provider === "hcaptcha") {
-      document.querySelectorAll('[name="h-captcha-response"], textarea#h-captcha-response')
-        .forEach((e) => { e.value = token; });
-      if (window.hcaptcha && window.__hcaptchaCb) window.__hcaptchaCb(token);
+      setVals('[name="h-captcha-response"], textarea#h-captcha-response, textarea[id^="h-captcha-response"]');
+      // make any consumer that reads hcaptcha.getResponse()/execute() see our token
+      window.hcaptcha = Object.assign(window.hcaptcha || {}, {
+        getResponse: () => token,
+        execute: () => Promise.resolve({ response: token }),
+        render: () => 0,
+        ready: (cb) => cb && cb(),
+      });
     } else if (provider === "turnstile") {
-      document.querySelectorAll('[name="cf-turnstile-response"]').forEach((e) => { e.value = token; });
+      setVals('[name="cf-turnstile-response"]');
+      window.turnstile = Object.assign(window.turnstile || {}, {
+        getResponse: () => token,
+        render: () => 0,
+        ready: (cb) => cb && cb(),
+      });
     } else if (provider === "recaptcha") {
-      document.querySelectorAll('[name="g-recaptcha-response"], #g-recaptcha-response')
-        .forEach((e) => { e.value = token; });
+      setVals('[name="g-recaptcha-response"], #g-recaptcha-response');
     }
   }, { provider, token });
 }

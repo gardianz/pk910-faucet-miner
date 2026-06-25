@@ -1,14 +1,27 @@
-# Sepolia PoW Faucet Miner
+# pk910 PoW Faucet Miner (Sepolia / Ephemery / Hoodi)
 
-Mines the pk910 Sepolia PoW faucet for up to 3 own addresses (native WS + reused nickminer WASM),
+Mines pk910 PoW faucets for up to 3 own addresses (native WS + reused PoW WASM),
 solving the start captcha via a short-lived headless browser + multibot.
+
+## Supported faucets
+Pick any one, two, or all three via `FAUCETS` in `.env` (comma separated).
+
+| Faucet   | PoW algo  | Captcha          | minClaim |
+|----------|-----------|------------------|----------|
+| sepolia  | nickminer | custom (rotates) | 0.05     |
+| ephemery | argon2    | hCaptcha         | 1.0      |
+| hoodi    | nickminer | custom (rotates) | 0.1      |
+
+PoW params / difficulty / captcha provider are read live per faucet from `getFaucetConfig`,
+so the miner adapts automatically. Default claim threshold = each faucet's `minClaim`
+(override globally with `CLAIM_THRESHOLD_WEI`).
 
 ## Setup
 ```bash
 npm install && npx playwright install chromium
-cp .env.example .env   # fill WALLET_*_ADDR, MULTIBOT_APIKEY, optional WALLET_*_PROXY
+cp .env.example .env   # set FAUCETS, WALLET_*_ADDR, MULTIBOT_APIKEY, optional WALLET_*_PROXY
 npm test               # unit tests
-npm start              # run miner over all configured wallets
+FAUCETS=sepolia,ephemery,hoodi npm start   # run selected faucets x wallets
 ```
 
 ## Notes

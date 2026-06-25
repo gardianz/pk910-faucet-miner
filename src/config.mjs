@@ -2,10 +2,24 @@ import "dotenv/config";
 
 const ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
+const DEFAULT_FAUCET_URLS = {
+  sepolia: "https://sepolia-faucet.pk910.de",
+  ephemery: "https://ephemery-faucet.pk910.de",
+  hoodi: "https://hoodi-faucet.pk910.de",
+};
+
 export function loadConfig(env = process.env) {
-  const faucetUrl = (env.FAUCET_URL || "https://sepolia-faucet.pk910.de").replace(/\/$/, "");
-  const wsUrl = faucetUrl.replace(/^http/, "ws") + "/ws/pow";
   const cliver = env.FAUCET_CLIVER || "2.4.0";
+
+  // which faucet(s) to run — comma separated (e.g. "sepolia,ephemery,hoodi")
+  const names = (env.FAUCETS || "sepolia")
+    .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (names.length === 0) throw new Error("no faucets selected (set FAUCETS)");
+  const faucets = names.map((name) => {
+    const url = (env[`${name.toUpperCase()}_URL`] || DEFAULT_FAUCET_URLS[name] || "").replace(/\/$/, "");
+    if (!url) throw new Error(`no URL for faucet "${name}" (set ${name.toUpperCase()}_URL)`);
+    return { name, url, wsUrl: url.replace(/^http/, "ws") + "/ws/pow", cliver };
+  });
 
   const multibotApikey = env.MULTIBOT_APIKEY;
   if (!multibotApikey) throw new Error("MULTIBOT_APIKEY is required");
@@ -21,5 +35,5 @@ export function loadConfig(env = process.env) {
   }
   if (wallets.length === 0) throw new Error("no wallets configured (set WALLET_1_ADDR..WALLET_3_ADDR)");
 
-  return { faucetUrl, wsUrl, cliver, multibotApikey, claimThresholdWei, wallets };
+  return { faucets, cliver, multibotApikey, claimThresholdWei, wallets };
 }
