@@ -16,10 +16,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function mineWallet({ wallet, cfg, api, solver, log = console }) {
   const faucetConfig = await api.getFaucetConfig(wallet.proxy);
   const pow = faucetConfig.modules.pow;
-  const params = pow.powParams;
-  const difficulty = pow.powDifficulty;
-  const hashrateLimit = pow.powHashrateLimit || 0;
-  const paramsStr = getPoWParamsStr(params, difficulty);
+  let params = pow.powParams;
+  let difficulty = pow.powDifficulty;
+  let hashrateLimit = pow.powHashrateLimit || 0;
+  let paramsStr = getPoWParamsStr(params, difficulty);
   const threshold = cfg.claimThresholdWei ?? BigInt(faucetConfig.maxClaim);
 
   log.info?.(`[${wallet.addr}] starting captcha + session`);
@@ -56,6 +56,32 @@ export async function mineWallet({ wallet, cfg, api, solver, log = console }) {
 
   await ws.connect();
 
+  let invalidShareStreak = 0;
+  let refreshing = false;
+  const REJECT_LIMIT = 10;
+  const onShareError = async (err) => {
+    log.warn?.(`[${wallet.addr}] share rejected: ${err.message}`);
+    if (!/INVALID_SHARE|Invalid share params/i.test(err.message)) return;
+    invalidShareStreak++;
+    if (invalidShareStreak < REJECT_LIMIT || refreshing) return;
+    refreshing = true;
+    try {
+      const fc = await api.getFaucetConfig(wallet.proxy);
+      const np = fc.modules.pow;
+      params = np.powParams;
+      difficulty = np.powDifficulty;
+      hashrateLimit = np.powHashrateLimit || 0;
+      paramsStr = getPoWParamsStr(params, difficulty);
+      setConfig(params, preHex);
+      invalidShareStreak = 0;
+      log.info?.(`[${wallet.addr}] refreshed powParams after ${REJECT_LIMIT} INVALID_SHARE`);
+    } catch (e) {
+      log.warn?.(`[${wallet.addr}] config refresh failed: ${e.message}`);
+    } finally {
+      refreshing = false;
+    }
+  };
+
   // mining loop, paced to hashrate limit, until threshold reached
   while (balance < threshold) {
     const budget = nextNonceBudget(startSec, lastNonce, hashrateLimit);
@@ -65,7 +91,8 @@ export async function mineWallet({ wallet, cfg, api, solver, log = console }) {
       const hash = run(nonceHex(lastNonce));
       if (isValidShare(hash, difficulty)) {
         ws.sendRequest("foundShare", { nonce: lastNonce, data: hash, params: paramsStr, hashrate: hashrateLimit })
-          .catch((err) => log.warn?.(`[${wallet.addr}] share rejected: ${err.message}`));
+          .then(() => { invalidShareStreak = 0; })
+          .catch((err) => onShareError(err));
       }
       lastNonce++;
     }

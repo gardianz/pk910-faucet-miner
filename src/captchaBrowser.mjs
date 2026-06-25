@@ -54,10 +54,12 @@ export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, h
   try {
     const page = await browser.newPage();
     // For recaptcha v3 the page reads grecaptcha.execute() internally — stub it once we have a token.
+    let startSessionStatus = null;
     const startSessionBody = new Promise((resolve) => {
       page.on("response", async (resp) => {
         if (resp.url().includes("/api/startSession")) {
-          try { resolve(await resp.json()); } catch { /* ignore */ }
+          startSessionStatus = resp.status();
+          try { resolve(await resp.json()); } catch { resolve(null); }
         }
       });
     });
@@ -93,7 +95,7 @@ export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, h
       startSessionBody,
       new Promise((_, rej) => setTimeout(() => rej(new Error("startSession timeout")), timeoutMs)),
     ]);
-    if (!sessionInfo || !sessionInfo.session) throw new Error(`startSession failed: ${JSON.stringify(sessionInfo)}`);
+    if (!sessionInfo || !sessionInfo.session) throw new Error(`startSession failed (HTTP ${startSessionStatus}): ${JSON.stringify(sessionInfo)}`);
     return sessionInfo;
   } finally {
     await browser.close();
