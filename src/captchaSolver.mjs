@@ -35,11 +35,11 @@ export class CaptchaSolver {
     return res.slice(3);
   }
 
-  async poll(id, { timeoutMs = 180000, intervalMs = 5000 } = {}) {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
+  async poll(id, { timeoutMs = 180000, intervalMs = 5000, onTick } = {}) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
       const res = await this._get(`${BASE}/res.php?key=${this.apikey}&action=get&id=${id}`);
-      if (res === "CAPCHA_NOT_READY") { await sleep(intervalMs); continue; }
+      if (res === "CAPCHA_NOT_READY") { onTick?.(Math.round((Date.now() - start) / 1000)); await sleep(intervalMs); continue; }
       if (res.startsWith("OK|")) return res.slice(3);
       throw new Error(`multibot poll failed: ${res}`);
     }

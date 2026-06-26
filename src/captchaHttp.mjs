@@ -8,9 +8,10 @@ export async function startSessionHttp({ api, faucetUrl, captcha, addr, proxy, s
   const method = captcha.provider === "recaptcha" ? "userrecaptcha" : captcha.provider;
   log.info?.(`  captcha=${captcha.provider} (direct, no browser) — solving via multibot (bisa 1-5 menit)...`);
   const t0 = Date.now();
+  let lastTick = 0;
   const token = await solver.solve(
     { method, sitekey: captcha.siteKey, pageurl: faucetUrl, proxy },
-    { timeoutMs: 300000, intervalMs: 5000 }
+    { timeoutMs: 300000, intervalMs: 5000, onTick: (s) => { if (s - lastTick >= 30) { lastTick = s; log.info?.(`  ...masih menunggu solver (${s}s)`); } } }
   );
   log.info?.(`  captcha solved in ${Math.round((Date.now() - t0) / 1000)}s (token ${token.length} chars), starting session...`);
   const sessionInfo = await api.startSession({ addr, captchaToken: token }, proxy);

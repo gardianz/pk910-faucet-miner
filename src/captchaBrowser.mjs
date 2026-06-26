@@ -97,7 +97,11 @@ export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, h
         const method = provider === "recaptcha" ? "userrecaptcha" : provider;
         log.info?.(`  [browser] captcha=${provider} detected — solving via multibot (bisa 1-5 menit)...`);
         const t0 = Date.now();
-        const token = await solver.solve({ method, sitekey, pageurl: faucetUrl, proxy }, { timeoutMs: solveTimeoutMs, intervalMs: 5000 });
+        let lastTick = 0;
+        const token = await solver.solve(
+          { method, sitekey, pageurl: faucetUrl, proxy },
+          { timeoutMs: solveTimeoutMs, intervalMs: 5000, onTick: (s) => { if (s - lastTick >= 30) { lastTick = s; log.info?.(`  [browser] ...masih menunggu solver (${s}s)`); } } }
+        );
         log.info?.(`  [browser] solved in ${Math.round((Date.now() - t0) / 1000)}s, injecting + starting session...`);
 
         if (provider === "recaptcha") {

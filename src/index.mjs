@@ -1,7 +1,13 @@
+import { setGlobalDispatcher, Agent } from "undici";
 import { loadConfig } from "./config.mjs";
 import { FaucetApi } from "./faucetApi.mjs";
 import { CaptchaSolver } from "./captchaSolver.mjs";
 import { mineWallet } from "./miner.mjs";
+
+// Force IPv4 for all HTTP. multibot/faucet hosts publish AAAA (IPv6) records that are
+// unreachable from many networks; Node's happy-eyeballs then intermittently ETIMEDOUTs,
+// which showed up as captcha solves "hanging" for the full timeout. (curl -4 = 100% ok.)
+setGlobalDispatcher(new Agent({ connect: { family: 4 } }));
 
 const log = {
   info: (...a) => console.log(new Date().toISOString(), ...a),
