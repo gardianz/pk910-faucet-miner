@@ -29,6 +29,12 @@ export function loadConfig(env = process.env) {
   const captchaApikey = env[apikeyEnv];
   if (!captchaApikey) throw new Error(`${apikeyEnv} is required (CAPTCHA_PROVIDER=${captchaProvider})`);
 
+  // run continuously (mine -> claim -> repeat) for 24/7 VPS use; LOOP=once for a single pass
+  const loopForever = (env.LOOP || "forever").trim().toLowerCase() !== "once";
+  const loopDelaySec = env.LOOP_DELAY_SEC ? Number(env.LOOP_DELAY_SEC) : 30;
+  if (!Number.isFinite(loopDelaySec) || loopDelaySec < 0)
+    throw new Error("LOOP_DELAY_SEC must be a non-negative number");
+
   const claimThresholdWei = env.CLAIM_THRESHOLD_WEI ? BigInt(env.CLAIM_THRESHOLD_WEI) : null;
 
   // alternative to an absolute threshold: mine until balance reaches this % of the faucet's maxClaim
@@ -45,5 +51,5 @@ export function loadConfig(env = process.env) {
   }
   if (wallets.length === 0) throw new Error("no wallets configured (set WALLET_1_ADDR..WALLET_3_ADDR)");
 
-  return { faucets, cliver, captchaProvider, captchaApikey, claimThresholdWei, claimPercent, wallets };
+  return { faucets, cliver, captchaProvider, captchaApikey, loopForever, loopDelaySec, claimThresholdWei, claimPercent, wallets };
 }

@@ -82,6 +82,18 @@ test("rejects unknown captcha provider", () => {
   assert.throws(() => loadConfig({ ...base, CAPTCHA_PROVIDER: "anticaptcha" }), /CAPTCHA_PROVIDER/);
 });
 
+test("loops forever by default with 30s delay", () => {
+  const cfg = loadConfig(base);
+  assert.equal(cfg.loopForever, true);
+  assert.equal(cfg.loopDelaySec, 30);
+});
+
+test("LOOP=once disables the loop; LOOP_DELAY_SEC overrides delay", () => {
+  assert.equal(loadConfig({ ...base, LOOP: "once" }).loopForever, false);
+  assert.equal(loadConfig({ ...base, LOOP_DELAY_SEC: "120" }).loopDelaySec, 120);
+  assert.throws(() => loadConfig({ ...base, LOOP_DELAY_SEC: "-5" }), /LOOP_DELAY_SEC/);
+});
+
 test("rejects unknown faucet without explicit url", () => {
   assert.throws(() => loadConfig({ ...base, FAUCETS: "goerli" }), /faucet "goerli"/);
 });

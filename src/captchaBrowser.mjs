@@ -95,7 +95,7 @@ export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, h
         if (!provider || !sitekey) throw new Error("captcha provider/sitekey not detected");
 
         const method = provider === "recaptcha" ? "userrecaptcha" : provider;
-        log.info?.(`  [browser] captcha=${provider} detected — solving via multibot (bisa 1-5 menit)...`);
+        log.info?.(`  [browser] captcha=${provider} detected — solving via ${solver.provider} (bisa 1-5 menit)...`);
         const t0 = Date.now();
         let lastTick = 0;
         const token = await solver.solve(

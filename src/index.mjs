@@ -14,13 +14,9 @@ const log = {
   warn: (...a) => console.warn(new Date().toISOString(), ...a),
 };
 
-async function main() {
-  const cfg = loadConfig();
-  const solver = new CaptchaSolver(cfg.captchaApikey, undefined, { provider: cfg.captchaProvider });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  log.info(`faucets: ${cfg.faucets.map((f) => f.name).join(", ")} | wallets: ${cfg.wallets.length}`);
-  log.info(`captcha: ${cfg.captchaProvider} | balance: ${await solver.balance().catch((e) => e.message)}`);
-
+async function runRound(cfg, solver) {
   for (const faucet of cfg.faucets) {
     const api = new FaucetApi(faucet.url, faucet.cliver);
     for (const wallet of cfg.wallets) {
@@ -33,6 +29,29 @@ async function main() {
       }
     }
   }
+}
+
+async function main() {
+  const cfg = loadConfig();
+  const solver = new CaptchaSolver(cfg.captchaApikey, undefined, { provider: cfg.captchaProvider });
+
+  log.info(`faucets: ${cfg.faucets.map((f) => f.name).join(", ")} | wallets: ${cfg.wallets.length}` +
+    ` | loop: ${cfg.loopForever ? `forever (delay ${cfg.loopDelaySec}s)` : "once"}`);
+
+  let round = 0;
+  do {
+    round++;
+    log.info(`=== round ${round} === captcha: ${cfg.captchaProvider} | balance: ${await solver.balance().catch((e) => e.message)}`);
+    try {
+      await runRound(cfg, solver);
+    } catch (err) {
+      log.warn(`round ${round} aborted: ${err.message}`); // never let one round kill the 24/7 loop
+    }
+    if (cfg.loopForever) {
+      log.info(`round ${round} done; sleeping ${cfg.loopDelaySec}s before next round`);
+      await sleep(cfg.loopDelaySec * 1000);
+    }
+  } while (cfg.loopForever);
   log.info("all faucets/wallets processed");
 }
 

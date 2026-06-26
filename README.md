@@ -81,8 +81,40 @@ FAUCETS=sepolia,ephemery,hoodi npm start
 ```
 
 Bot memproses tiap faucet × tiap wallet secara berurutan. Kalau satu kombinasi
-gagal (mis. captcha), yang lain tetap lanjut. Saat selesai akan tampil
-`claimHash` + link explorer.
+gagal (mis. captcha), yang lain tetap lanjut. Tiap claim sukses tampil
+`claimHash` + saldo.
+
+### Mode jalan terus (default) vs sekali
+
+Default `LOOP=forever`: setelah semua faucet×wallet selesai (mine → claim),
+bot tidur `LOOP_DELAY_SEC` detik lalu **mulai ronde baru otomatis** — cocok
+untuk VPS 24 jam. Tiap ronde mulai dengan log saldo provider captcha (biar
+kelihatan sisa saldo solver). Ronde yang error tidak mematikan loop.
+
+```bash
+LOOP=once npm start        # sekali jalan saja, lalu berhenti
+LOOP_DELAY_SEC=120 npm start  # jeda 2 menit antar ronde
+```
+
+> Tiap ronde = 1 captcha solve berbayar per wallet. Atur `LOOP_DELAY_SEC` &
+> `CLAIM_PERCENT` sesuai saldo solver biar tidak boros.
+
+### Menjalankan 24 jam di VPS
+
+Pakai process manager supaya tetap hidup setelah logout / restart:
+
+```bash
+# pm2 (paling gampang)
+npm i -g pm2
+pm2 start npm --name faucet-miner -- start
+pm2 logs faucet-miner      # lihat log
+pm2 save && pm2 startup    # auto-start saat VPS reboot
+```
+```bash
+# alternatif tanpa pm2
+nohup npm start > miner.log 2>&1 &
+tail -f miner.log
+```
 
 ---
 

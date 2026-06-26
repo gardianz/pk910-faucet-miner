@@ -6,7 +6,7 @@
 // token to a browser fingerprint + challenge, so those still need startSessionViaBrowser.
 export async function startSessionHttp({ api, faucetUrl, captcha, addr, proxy, solver, log = console }) {
   const method = captcha.provider === "recaptcha" ? "userrecaptcha" : captcha.provider;
-  log.info?.(`  captcha=${captcha.provider} (direct, no browser) — solving via multibot (bisa 1-5 menit)...`);
+  log.info?.(`  captcha=${captcha.provider} (direct, no browser) — solving via ${solver.provider} (bisa 1-5 menit)...`);
   const t0 = Date.now();
   let lastTick = 0;
   const token = await solver.solve(
