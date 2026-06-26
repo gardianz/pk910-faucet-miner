@@ -120,10 +120,17 @@ export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, h
           new Promise((r) => setTimeout(() => r({ _timeout: true }), 60000)),
         ]);
         if (sessionInfo && sessionInfo.session) return sessionInfo;
-        throw new Error(`startSession failed (HTTP ${startSessionStatus}): ${JSON.stringify(sessionInfo)}`);
+        const err = new Error(`startSession failed (HTTP ${startSessionStatus}): ${JSON.stringify(sessionInfo)}`);
+        // Only a captcha rejection is worth re-solving. Other faucet rejections
+        // (IP block, address restriction, …) fail identically next attempt, so
+        // abort now instead of burning more paid captcha solves.
+        const code = sessionInfo?.failedCode;
+        if (code && code !== "INVALID_CAPTCHA") err.fatal = true;
+        throw err;
       } catch (e) {
         lastErr = e;
-        if (attempt < attempts) continue; // reload + fresh captcha challenge on next iteration
+        if (e.fatal) break;                  // non-captcha faucet rejection: don't retry
+        if (attempt < attempts) continue;    // reload + fresh captcha challenge on next iteration
       }
     }
     throw lastErr;

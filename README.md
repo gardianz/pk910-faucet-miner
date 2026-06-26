@@ -168,6 +168,17 @@ Kecepatan solve captcha tergantung kapasitas multibot dan bisa lambat/variatif
 Kalau tetap gagal, pastikan saldo multibot cukup, lalu coba lagi belakangan saat
 solver lebih cepat.
 
+### `IPINFO_RESTRICTION` / "IP Blocked: hosting IP range"
+Faucet pk910 menolak IP datacenter/hosting (VPS Tencent/AWS/GCP/dll). Captcha
+boleh lolos, tapi `startSession` tetap ditolak. Solusi: set `WALLET_n_PROXY` ke
+proxy **residential/mobile** (proxy datacenter ikut ke-block). Bot mengarahkan
+browser, solver, WebSocket, dan API lewat proxy itu sekaligus.
+```
+WALLET_1_PROXY=http://user:pass@host:port   # atau socks5://host:port
+```
+Saat ditolak alasan non-captcha begini, bot langsung berhenti (tidak solve
+captcha berulang) supaya saldo solver tidak terbuang.
+
 ### Lainnya
 - **Rotate API key multibot** kalau pernah ke-share di chat/plaintext.
 - Reward dikirim ke `WALLET_n_ADDR`; private key tidak diperlukan/disimpan.
