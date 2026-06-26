@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { playwrightProxy } from "./proxyAgent.mjs";
 
 // Detect provider + sitekey from the rendered widgets.
 async function detectProvider(page) {
@@ -59,7 +60,7 @@ async function injectToken(page, provider, token) {
 
 export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, headless = true, timeoutMs = 180000, attempts = 3, solveTimeoutMs = 300000, log = console }) {
   const launchOpts = { headless, args: ["--no-sandbox", "--disable-setuid-sandbox"] };
-  if (proxy) launchOpts.proxy = { server: proxy };
+  if (proxy) launchOpts.proxy = playwrightProxy(proxy);
   // Optional: point the Chromium child at extracted system libs (no-root WSL/containers).
   // Set CHROME_LIBS_PATH to a dir containing libnspr4.so/libnss3.so/... in .env.
   if (process.env.CHROME_LIBS_PATH) {
@@ -87,9 +88,11 @@ export async function startSessionViaBrowser({ faucetUrl, addr, proxy, solver, h
         log.info?.(`  [browser] attempt ${attempt}/${attempts}: loading page + rendering captcha...`);
         await page.goto(faucetUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
         await page.fill('input[type="text"], input[placeholder*="ddress"]', addr);
+        // state:attached (not visible) — we only read the sitekey from the iframe
+        // src; the widget needn't be visible, and residential proxies render it slowly.
         await page.waitForSelector(
           'iframe[src*="hcaptcha.com"], iframe[src*="challenges.cloudflare.com"], iframe[src*="recaptcha"]',
-          { timeout: 60000 }
+          { timeout: 60000, state: "attached" }
         );
         const { provider, sitekey } = await detectProvider(page);
         if (!provider || !sitekey) throw new Error("captcha provider/sitekey not detected");
