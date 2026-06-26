@@ -8,9 +8,22 @@ export class FaucetApi {
     this.requestFn = requestFn;
   }
 
+  // Parse JSON but, on non-JSON (nginx/Cloudflare 5xx HTML, gateway timeouts),
+  // throw a readable error with the HTTP status + a body snippet instead of a
+  // cryptic "Unexpected token '<'".
+  async _parse(res, path) {
+    const text = await res.body.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      const snippet = text.replace(/\s+/g, " ").trim().slice(0, 160);
+      throw new Error(`${path} -> HTTP ${res.statusCode} non-JSON: ${snippet}`);
+    }
+  }
+
   async _get(path, proxy) {
     const res = await this.requestFn(this.base + path, { dispatcher: httpDispatcher(proxy) });
-    return res.body.json();
+    return this._parse(res, path);
   }
 
   async _post(path, body, proxy) {
@@ -20,7 +33,7 @@ export class FaucetApi {
       body: JSON.stringify(body),
       dispatcher: httpDispatcher(proxy),
     });
-    return res.body.json();
+    return this._parse(res, path);
   }
 
   getFaucetConfig(proxy) { return this._get(`/getFaucetConfig?cliver=${encodeURIComponent(this.cliver)}`, proxy); }

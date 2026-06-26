@@ -27,6 +27,12 @@ test("startSession posts addr+captchaToken to cliver-tagged endpoint", async () 
   assert.deepEqual(JSON.parse(calls[0].options.body), { addr: "0xabc", captchaToken: "tok" });
 });
 
+test("non-JSON response throws readable status+snippet", async () => {
+  const requestFn = async () => ({ statusCode: 504, body: { text: async () => "<html><head><title>504 Gateway Time-out</title></head></html>" } });
+  const api = new FaucetApi("https://ephemery-faucet.pk910.de", "2.4.0", requestFn);
+  await assert.rejects(() => api.startSession({ addr: "0xabc", captchaToken: "tok" }), /HTTP 504 non-JSON: <html>.*504 Gateway/);
+});
+
 test("claimReward posts session body", async () => {
   const { calls, requestFn } = recorder({ status: "claiming" });
   const api = new FaucetApi("https://sepolia-faucet.pk910.de", "2.4.0", requestFn);
