@@ -26,8 +26,11 @@ jadi masih butuh Chromium headless singkat saat mulai sesi.
 ## Yang dibutuhkan
 
 - **Node.js ≥ 20** (`node -v` untuk cek).
-- **Akun multibot** (https://multibot.cloud) + **saldo** + **API key** — dipakai
-  untuk menyelesaikan captcha.
+- **Akun captcha solver** + **saldo** + **API key** — dipakai untuk menyelesaikan
+  captcha. Dukung dua provider (pilih lewat `CAPTCHA_PROVIDER`):
+  - `multibot` (default) — https://multibot.cloud, isi `MULTIBOT_APIKEY`.
+  - `2captcha` — https://2captcha.com, isi `TWOCAPTCHA_APIKEY`.
+  Keduanya pakai protokol legacy yang sama, jadi tinggal ganti provider + key.
 - **1–3 alamat ETH** tujuan reward (cukup alamat publik; private key TIDAK diperlukan).
 
 ---
@@ -55,7 +58,8 @@ Lalu buka `.env` dan isi:
   - satu: `FAUCETS=sepolia`
   - dua: `FAUCETS=sepolia,hoodi`
   - tiga: `FAUCETS=sepolia,ephemery,hoodi`
-- `MULTIBOT_APIKEY` — API key dari dashboard multibot.
+- `CAPTCHA_PROVIDER` — `multibot` (default) atau `2captcha`.
+- `MULTIBOT_APIKEY` / `TWOCAPTCHA_APIKEY` — API key sesuai provider yang dipilih.
 - `WALLET_1_ADDR` — alamat ETH tujuan reward (wajib minimal satu). Bisa tambah
   `WALLET_2_ADDR` dan `WALLET_3_ADDR`.
 - `WALLET_n_PROXY` — opsional, proxy per wallet (`http://user:pass@host:port`

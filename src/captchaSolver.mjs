@@ -1,10 +1,21 @@
-const BASE = "https://api.multibot.cloud";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// multibot.cloud and 2captcha.com share the legacy in.php/res.php protocol.
+// They differ only by host and the balance "action" name.
+const PROVIDERS = {
+  multibot: { base: "https://api.multibot.cloud", balanceAction: "userinfo" },
+  "2captcha": { base: "https://2captcha.com", balanceAction: "getbalance" },
+};
+
 export class CaptchaSolver {
-  constructor(apikey, fetchFn = (url) => fetch(url)) {
+  constructor(apikey, fetchFn = (url) => fetch(url), { provider = "multibot" } = {}) {
+    const cfg = PROVIDERS[provider];
+    if (!cfg) throw new Error(`unknown captcha provider: ${provider}`);
     this.apikey = apikey;
     this.fetchFn = fetchFn;
+    this.provider = provider;
+    this.base = cfg.base;
+    this.balanceAction = cfg.balanceAction;
   }
 
   async _get(url, retries = 6) {
@@ -30,7 +41,7 @@ export class CaptchaSolver {
       params.set("proxy", proxy.replace(/^\w+:\/\//, ""));
       params.set("proxytype", proxy.startsWith("socks5") ? "SOCKS5" : "HTTP");
     }
-    const res = await this._get(`${BASE}/in.php?${params.toString()}`);
+    const res = await this._get(`${this.base}/in.php?${params.toString()}`);
     if (!res.startsWith("OK|")) throw new Error(`multibot submit failed: ${res}`);
     return res.slice(3);
   }
@@ -38,7 +49,7 @@ export class CaptchaSolver {
   async poll(id, { timeoutMs = 180000, intervalMs = 5000, onTick } = {}) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
-      const res = await this._get(`${BASE}/res.php?key=${this.apikey}&action=get&id=${id}`);
+      const res = await this._get(`${this.base}/res.php?key=${this.apikey}&action=get&id=${id}`);
       if (res === "CAPCHA_NOT_READY") { onTick?.(Math.round((Date.now() - start) / 1000)); await sleep(intervalMs); continue; }
       if (res.startsWith("OK|")) return res.slice(3);
       throw new Error(`multibot poll failed: ${res}`);
@@ -52,6 +63,6 @@ export class CaptchaSolver {
   }
 
   async balance() {
-    return this._get(`${BASE}/res.php?action=userinfo&key=${this.apikey}`);
+    return this._get(`${this.base}/res.php?action=${this.balanceAction}&key=${this.apikey}`);
   }
 }

@@ -61,6 +61,27 @@ test("requires multibot apikey", () => {
   assert.throws(() => loadConfig(noKey), /MULTIBOT_APIKEY/);
 });
 
+test("defaults captcha provider to multibot", () => {
+  const cfg = loadConfig(base);
+  assert.equal(cfg.captchaProvider, "multibot");
+  assert.equal(cfg.captchaApikey, "key123");
+});
+
+test("selects 2captcha provider with its own key", () => {
+  const { MULTIBOT_APIKEY, ...noMb } = base;
+  const cfg = loadConfig({ ...noMb, CAPTCHA_PROVIDER: "2captcha", TWOCAPTCHA_APIKEY: "tc999" });
+  assert.equal(cfg.captchaProvider, "2captcha");
+  assert.equal(cfg.captchaApikey, "tc999");
+});
+
+test("requires 2captcha key when provider is 2captcha", () => {
+  assert.throws(() => loadConfig({ ...base, CAPTCHA_PROVIDER: "2captcha" }), /TWOCAPTCHA_APIKEY/);
+});
+
+test("rejects unknown captcha provider", () => {
+  assert.throws(() => loadConfig({ ...base, CAPTCHA_PROVIDER: "anticaptcha" }), /CAPTCHA_PROVIDER/);
+});
+
 test("rejects unknown faucet without explicit url", () => {
   assert.throws(() => loadConfig({ ...base, FAUCETS: "goerli" }), /faucet "goerli"/);
 });

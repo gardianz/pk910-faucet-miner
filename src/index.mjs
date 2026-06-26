@@ -16,10 +16,10 @@ const log = {
 
 async function main() {
   const cfg = loadConfig();
-  const solver = new CaptchaSolver(cfg.multibotApikey);
+  const solver = new CaptchaSolver(cfg.captchaApikey, undefined, { provider: cfg.captchaProvider });
 
   log.info(`faucets: ${cfg.faucets.map((f) => f.name).join(", ")} | wallets: ${cfg.wallets.length}`);
-  log.info(`multibot balance: ${await solver.balance().catch((e) => e.message)}`);
+  log.info(`captcha: ${cfg.captchaProvider} | balance: ${await solver.balance().catch((e) => e.message)}`);
 
   for (const faucet of cfg.faucets) {
     const api = new FaucetApi(faucet.url, faucet.cliver);

@@ -21,8 +21,13 @@ export function loadConfig(env = process.env) {
     return { name, url, wsUrl: url.replace(/^http/, "ws") + "/ws/pow", cliver };
   });
 
-  const multibotApikey = env.MULTIBOT_APIKEY;
-  if (!multibotApikey) throw new Error("MULTIBOT_APIKEY is required");
+  // captcha solver: "multibot" (default) or "2captcha" — same legacy protocol, different host/key
+  const captchaProvider = (env.CAPTCHA_PROVIDER || "multibot").trim().toLowerCase();
+  const apikeyEnvByProvider = { multibot: "MULTIBOT_APIKEY", "2captcha": "TWOCAPTCHA_APIKEY" };
+  const apikeyEnv = apikeyEnvByProvider[captchaProvider];
+  if (!apikeyEnv) throw new Error(`CAPTCHA_PROVIDER must be "multibot" or "2captcha", got "${captchaProvider}"`);
+  const captchaApikey = env[apikeyEnv];
+  if (!captchaApikey) throw new Error(`${apikeyEnv} is required (CAPTCHA_PROVIDER=${captchaProvider})`);
 
   const claimThresholdWei = env.CLAIM_THRESHOLD_WEI ? BigInt(env.CLAIM_THRESHOLD_WEI) : null;
 
@@ -40,5 +45,5 @@ export function loadConfig(env = process.env) {
   }
   if (wallets.length === 0) throw new Error("no wallets configured (set WALLET_1_ADDR..WALLET_3_ADDR)");
 
-  return { faucets, cliver, multibotApikey, claimThresholdWei, claimPercent, wallets };
+  return { faucets, cliver, captchaProvider, captchaApikey, claimThresholdWei, claimPercent, wallets };
 }

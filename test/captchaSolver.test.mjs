@@ -32,3 +32,29 @@ test("submit uses googlekey for recaptcha, sitekey otherwise", async () => {
   assert.ok(!/[?&]sitekey=/.test(urls[0]), "recaptcha must not send sitekey");
   assert.match(urls[1], /[?&]sitekey=HC(&|$)/);
 });
+
+test("default provider is multibot (host + balance action)", async () => {
+  const urls = [];
+  const rec = (url) => { urls.push(url); return { text: async () => "OK|1" }; };
+  const s = new CaptchaSolver("k", rec);
+  assert.equal(s.provider, "multibot");
+  await s.submit({ method: "hcaptcha", sitekey: "H", pageurl: "https://x" });
+  await s.balance();
+  assert.match(urls[0], /^https:\/\/api\.multibot\.cloud\/in\.php\?/);
+  assert.match(urls[1], /\/res\.php\?action=userinfo&/);
+});
+
+test("2captcha provider routes to 2captcha.com with getbalance", async () => {
+  const urls = [];
+  const rec = (url) => { urls.push(url); return { text: async () => "OK|1" }; };
+  const s = new CaptchaSolver("k", rec, { provider: "2captcha" });
+  await s.submit({ method: "userrecaptcha", sitekey: "RC", pageurl: "https://x" });
+  await s.balance();
+  assert.match(urls[0], /^https:\/\/2captcha\.com\/in\.php\?/);
+  assert.match(urls[0], /[?&]googlekey=RC(&|$)/);
+  assert.match(urls[1], /^https:\/\/2captcha\.com\/res\.php\?action=getbalance&/);
+});
+
+test("unknown provider throws", () => {
+  assert.throws(() => new CaptchaSolver("k", undefined, { provider: "nope" }), /unknown captcha provider/);
+});
